@@ -6,47 +6,93 @@
 //  Copyright © 2020 App Brewery. All rights reserved.
 //
 
-import Foundation
+import UIKit
+import CoreData
 
-struct DataModel {
+class DataModel {
+	let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+	var categoryArray: [Category] = []
 	var itemArray: [Item] = []
-	let dataFilePath: URL?
-	let decoder = PropertyListDecoder()
-	let encoder = PropertyListEncoder()
+	var currentCategory: Category? {
+		didSet {
+			loadItems()
+		}
+	}
 	
 	init() {
-		dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(K.defaultKeyForArray)
-		if dataFilePath != nil {
-			loadItems(url: dataFilePath!)
+		loadCategories()
+	}
+	
+	func saveChanges() {
+		do {
+			try context.save()
+		} catch {
+			print("Error saving context: \(error)")
 		}
 	}
 	
-	mutating func loadItems(url: URL) {
+	//MARK: - Category Methods
+	
+	func loadCategories() {
+		let request = NSFetchRequest<Category>(entityName: "Category")
+
 		do {
-			let data = try Data(contentsOf: url)
-			itemArray = try decoder.decode([Item].self, from: data)
+			categoryArray = try context.fetch(request)
 		} catch {
-			print(error)
+			print("Error fetching data from context: \(error)")
 		}
 	}
 	
-	func saveItems() {
-		do {
-			let data = try encoder.encode(itemArray)
-			try data.write(to: dataFilePath!)
-		} catch {
-			print(error)
+	func addNewCategory(with title: String) {
+		let NewCategory = Category(context: context)
+		
+		NewCategory.name = title
+		categoryArray.append(NewCategory)
+		saveChanges()
+	}
+	
+	func setCurrentCategory(at index: Int) {
+		currentCategory = categoryArray[index]
+	}
+	
+	//MARK: - Item Methods
+	
+	func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest(), and predicate: NSPredicate? = nil) {
+		
+		let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES[dc] %@", currentCategory!.name!)
+		
+		if let additionalPredicate = predicate {
+			request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate, additionalPredicate])
+		} else {
+			request.predicate = categoryPredicate
 		}
 		
+		do {
+			itemArray = try context.fetch(request)
+		} catch {
+			print("Error fetching data from context: \(error)")
+		}
 	}
 	
-	mutating func addNewItem(with title: String) {
-		itemArray.append(Item(title: title))
-		saveItems()
+	func addNewItem(with title: String) {
+		let newItem = Item(context: context)
+		
+		newItem.title = title
+		newItem.done = false
+		newItem.parentCategory = currentCategory
+		itemArray.append(newItem)
+		saveChanges()
 	}
 	
-	mutating func toggleCheckBox(on cell: Int) {
+	func toggleCheckBox(on cell: Int) {
 		itemArray[cell].done = !itemArray[cell].done
-		saveItems()
+		saveChanges()
+	}
+	
+	func searchItem(contains text: String) {
+		let request = NSFetchRequest<Item>(entityName: "Item")
+		let predicate = NSPredicate(format: "title CONTAINS[dc] %@", text)
+
+		loadItems(with: request, and: predicate)
 	}
 }

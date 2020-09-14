@@ -7,6 +7,7 @@
 //
 
 struct K {
-	static let reusableIdentifier = "ToDoItemCell"
-	static let defaultKeyForArray = "Items.plist"
+	static let reusableItemCell = "ToDoItemCell"
+	static let reusableCategoryCell = "CategoryCell"
+	static let segueToItems = "goToItems"
 }
